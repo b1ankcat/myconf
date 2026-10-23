@@ -1,0 +1,223 @@
+# =============================================================================
+#  ~/.gitconfig —— 便利性增强 + 命令简化（Windows / Linux / macOS 通用）
+#
+#  兼容性：最低 git 2.27（Rocky / RHEL 8 自带版本）。
+#    - 本文件不包含会让旧版 git 报错的取值。
+#    - 标注 [2.xx+] 的选项在旧版中会被静默忽略，不影响使用。
+#
+#  平台相关配置（凭据、换行符、fsmonitor 等）以及 user.name / user.email
+#  请写在 ~/.gitconfig.local 中（文件不存在时自动忽略），参考 gitconfig.local.example。
+# =============================================================================
+
+[core]
+    autocrlf = input                  # 提交时 CRLF -> LF，检出不转换；三端统一用 LF
+    whitespace = trailing-space,space-before-tab
+    quotepath = false                 # 中文文件名正常显示，不转义为 \346\226\207
+    precomposeunicode = true          # macOS 文件名 Unicode 规范化（其它平台无影响）
+    longpaths = true                  # Windows 支持超过 260 字符的路径（其它平台无影响）
+    untrackedCache = true             # 加速 git status
+    pager = less -FRX                 # 内容少于一屏直接输出，保留颜色
+
+[init]
+    defaultBranch = main              # [2.28+]
+
+[color]
+    ui = auto
+
+[column]
+    ui = auto                         # branch / tag 等列表分栏显示
+
+[branch]
+    sort = -committerdate             # 最近活跃分支排在前面
+
+[tag]
+    sort = version:refname            # v1.10 排在 v1.9 后面
+
+[status]
+    branch = true
+    submoduleSummary = true
+
+[diff]
+    algorithm = histogram             # 更易读的 diff
+    colorMoved = plain                # 移动的代码用不同颜色标出
+    colorMovedWS = allow-indentation-change
+    mnemonicPrefix = true             # i/ w/ c/ 代替 a/ b/
+    renames = copies
+    submodule = log
+
+[merge]
+    conflictstyle = diff3             # 冲突时同时显示共同祖先（2.35+ 可在 local 中改为 zdiff3）
+    log = true                        # 合并提交信息附带被合并的提交列表
+
+[pull]
+    rebase = true                     # pull 默认 rebase，保持线性历史
+
+[rebase]
+    autoStash = true                  # rebase 前自动 stash，结束后恢复
+    autoSquash = true                 # 自动处理 fixup!/squash! 提交
+    updateRefs = true                 # [2.38+] 堆叠分支一起更新
+    missingCommitsCheck = warn
+
+[push]
+    default = current                 # 推送当前分支到同名远程分支
+    autoSetupRemote = true            # [2.37+] 首次 push 自动设置 upstream；旧版用 git pu
+    followTags = true                 # 同时推送带注释的 tag
+
+[fetch]
+    prune = true                      # 自动清理远程已删除的分支
+    pruneTags = true
+    writeCommitGraph = true
+
+[rerere]
+    enabled = true                    # 记住冲突解决方式，下次自动应用
+    autoupdate = true
+
+[commit]
+    verbose = true                    # 编辑提交信息时显示 diff
+
+[log]
+    date = iso-local
+    abbrevCommit = true
+    follow = true                     # 单文件 log 自动跟踪重命名
+
+[grep]
+    lineNumber = true
+    extendedRegexp = true
+
+[submodule]
+    recurse = true                    # checkout/pull 等自动处理子模块
+
+# =============================================================================
+#  命令别名
+#  "!" 开头的别名在 Windows 上由 Git for Windows 自带的 sh 执行，三端行为一致
+# =============================================================================
+[alias]
+    # ---------- 基础缩写 ----------
+    s   = status -sb
+    st  = status
+    a   = add
+    aa  = add --all
+    ap  = add --patch
+    c   = commit
+    cm  = commit -m
+    ca  = commit --amend
+    can = commit --amend --no-edit
+    cam = commit -am
+    co  = checkout
+    sw  = switch
+    swc = switch -c
+    br  = branch
+    bra = branch -a
+    brd = branch -d
+    brD = branch -D
+    rs  = restore
+    rss = restore --staged
+    f   = fetch
+    fa  = fetch --all
+    p   = push
+    pf  = push --force-with-lease     # 安全的强推
+    pl  = pull
+    cp  = cherry-pick
+    cpc = cherry-pick --continue
+    cpa = cherry-pick --abort
+    m   = merge
+    ma  = merge --abort
+    rb  = rebase
+    rbi = rebase -i
+    rbc = rebase --continue
+    rba = rebase --abort
+    rbs = rebase --skip
+    cl  = clone
+    clr = clone --recurse-submodules
+
+    # ---------- diff ----------
+    d   = diff
+    ds  = diff --staged
+    dw  = diff --word-diff
+    dst = diff --stat
+    dn  = diff --name-only
+    last = show --stat -p HEAD        # 最近一次提交的改动
+
+    # ---------- log ----------
+    l   = log --oneline --graph --decorate
+    la  = log --oneline --graph --decorate --all
+    ll  = log --graph --decorate --stat
+    lg  = log --graph --date=relative --format='%C(yellow)%h%C(reset) -%C(auto)%d%C(reset) %s %C(green)(%ad)%C(reset) %C(blue)<%an>%C(reset)'
+    lga = !git lg --all
+    lp  = log -p
+    lf  = log --follow -p --          # 某个文件的完整历史：git lf <file>
+    today = !git log --since=midnight --author=\"$(git config user.name)\" --oneline
+    mine  = !git log --author=\"$(git config user.email)\" --oneline
+    unpushed = log --oneline @{upstream}..HEAD
+    unpulled = !git fetch -q && git log --oneline HEAD..@{upstream}
+
+    # ---------- stash ----------
+    ss  = stash push
+    ssm = stash push -m
+    ssu = stash push --include-untracked
+    sl  = stash list
+    sp  = stash pop
+    sa  = stash apply
+    sd  = stash drop
+    sshow = stash show -p
+
+    # ---------- 撤销 / 回退 ----------
+    undo    = reset --soft HEAD~1     # 撤销上次提交，保留改动在暂存区
+    unstage = restore --staged --
+    discard = restore --              # 丢弃工作区改动：git discard <file>
+    nuke    = !git reset --hard HEAD && git clean -fd   # 危险：清空所有未提交改动
+    wip     = !git add -A && git commit -m 'WIP' --no-verify
+    unwip   = !git log -1 --format=%s | grep -q '^WIP$' && git reset HEAD~1
+    fixup   = commit --fixup          # git fixup <sha>，再 git rbi <sha>~ 自动合并
+    amend-date = commit --amend --no-edit --date=now
+
+    # ---------- 分支管理 ----------
+    current = branch --show-current
+    # 远程默认分支名（origin/HEAD 不存在时回退到 main / master）
+    default-branch = "!f() { b=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null); b=${b#origin/}; if [ -z \"$b\" ]; then if git show-ref --verify --quiet refs/remotes/origin/main; then b=main; else b=master; fi; fi; echo \"$b\"; }; f"
+    # 按最近提交时间列出分支
+    recent = for-each-ref --sort=-committerdate --count=20 --format='%(color:yellow)%(refname:short)%(color:reset) - %(color:green)%(committerdate:relative)%(color:reset) - %(contents:subject)' refs/heads/
+    # 删除已合并到当前分支的本地分支（保留当前分支及 main/master/develop/dev）
+    cleanup = "!f() { cur=$(git branch --show-current); git for-each-ref --merged HEAD --format='%(refname:short)' refs/heads/ | grep -vxE 'main|master|develop|dev' | grep -vxF \"${cur:-HEAD}\" | while read -r b; do git branch -d \"$b\"; done; }; f"
+    # 删除远程已不存在的本地分支
+    gone = "!f() { git fetch -p && git for-each-ref --format='%(refname:short) %(upstream:track)' refs/heads/ | awk '$2 == \"[gone]\" {print $1}' | while read -r b; do git branch -D \"$b\"; done; }; f"
+    # 推送当前分支并设置 upstream
+    pu = "!f() { git push -u origin \"$(git branch --show-current)\" \"$@\"; }; f"
+    # 删除远程分支：git rmb <branch>
+    rmb = push origin --delete
+    # 把当前分支 rebase 到最新的默认分支
+    sync = "!f() { git fetch origin && git rebase \"origin/$(git default-branch)\"; }; f"
+    # 切到默认分支并拉取
+    main = "!f() { git switch \"$(git default-branch)\" && git pull; }; f"
+
+    # ---------- 信息查看 ----------
+    aliases  = !git config --get-regexp '^alias\\.' | sed 's/^alias\\.//' | sort
+    remotes  = remote -v
+    tags     = tag -l --sort=-version:refname
+    contributors = shortlog -sne --all
+    whoami   = !echo \"$(git config user.name) <$(git config user.email)>\"
+    root     = rev-parse --show-toplevel
+    ignored  = ls-files --others --ignored --exclude-standard
+    untracked = ls-files --others --exclude-standard
+    conflicts = diff --name-only --diff-filter=U
+    who      = blame -w -C -C -C      # 忽略空白，跟踪代码移动
+    find     = "!f() { git ls-files | grep -i -- \"$1\"; }; f"   # 按名称查找已跟踪文件
+    grepall  = "!f() { git rev-list --all | xargs git grep \"$@\"; }; f"   # 在全部历史中搜索
+    size     = count-objects -vH
+
+    # ---------- 其它 ----------
+    acm  = !git add -A && git commit -m
+    # 一键提交并推送：git save "message"
+    save = "!f() { git add -A && git commit -m \"$1\" && git push; }; f"
+    # 忽略/取消忽略本地对已跟踪文件的修改
+    assume   = update-index --assume-unchanged
+    unassume = update-index --no-assume-unchanged
+    assumed  = !git ls-files -v | grep '^h' | cut -c 3-
+    # 初始化仓库并创建空的首次提交
+    start = !git init && git commit --allow-empty -m 'Initial commit'
+    # 子模块全部更新
+    subup = submodule update --init --recursive
+
+# 放在最后，使本地配置可以覆盖以上任何设置；文件不存在时自动忽略
+[include]
+    path = ~/.gitconfig.local
