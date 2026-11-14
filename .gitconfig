@@ -146,8 +146,8 @@
     lga = !git lg --all
     lp  = log -p
     lf  = log --follow -p --          # 某个文件的完整历史：git lf <file>
-    today = !git log --since=midnight --author=\"$(git config user.name)\" --oneline
-    mine  = !git log --author=\"$(git config user.email)\" --oneline
+    today = "!f() { n=$(git config user.name); [ -n \"$n\" ] || { echo 'user.name is not set' >&2; return 1; }; git log --since=midnight --author=\"$n\" --oneline; }; f"
+    mine  = "!f() { e=$(git config user.email); [ -n \"$e\" ] || { echo 'user.email is not set' >&2; return 1; }; git log --author=\"$e\" --oneline; }; f"
     unpushed = log --oneline @{upstream}..HEAD
     unpulled = !git fetch -q && git log --oneline HEAD..@{upstream}
 
@@ -202,13 +202,13 @@
     conflicts = diff --name-only --diff-filter=U
     who      = blame -w -C -C -C      # 忽略空白，跟踪代码移动
     find     = "!f() { git ls-files | grep -i -- \"$1\"; }; f"   # 按名称查找已跟踪文件
-    grepall  = "!f() { git rev-list --all | xargs git grep \"$@\"; }; f"   # 在全部历史中搜索
+    grepall  = "!f() { [ -n \"$(git rev-list -n 1 --all 2>/dev/null)\" ] || return 0; n=0; total=$#; while [ \"$n\" -lt \"$total\" ]; do [ \"$1\" = '--' ] && break; set -- \"$@\" \"$1\"; shift; n=$((n + 1)); done; if [ \"$n\" -eq \"$total\" ]; then git rev-list --all | xargs git grep \"$@\"; else m=$((total - n)); git rev-list --all | xargs sh -c 'm=$1; shift; while [ \"$m\" -gt 0 ]; do set -- \"$@\" \"$1\"; shift; m=$((m - 1)); done; exec git grep \"$@\"' _ \"$m\" \"$@\"; fi; }; f"   # 在全部历史中搜索
     size     = count-objects -vH
 
     # ---------- 其它 ----------
     acm  = !git add -A && git commit -m
     # 一键提交并推送：git save "message"
-    save = "!f() { git add -A && git commit -m \"$1\" && git push; }; f"
+    save = "!f() { [ -n \"$1\" ] || { echo 'usage: git save <message>' >&2; return 1; }; git add -A && git commit -m \"$*\" && git push; }; f"
     # 忽略/取消忽略本地对已跟踪文件的修改
     assume   = update-index --assume-unchanged
     unassume = update-index --no-assume-unchanged

@@ -109,8 +109,10 @@ set wildignore+=*.o,*.obj,*.so,*.a,*.pyc,__pycache__/*,.git/*,build/*,dist/*
 " 不使用 path+=**：大仓库里 gf / :find 递归遍历会很慢，文件查找交给下方的 :F
 
 set completeopt=menuone,preview
-if v:version >= 704
+if exists('*complete_info')
   silent! set completeopt+=noselect
+endif
+if v:version >= 704
   silent! set shortmess+=c
 endif
 set omnifunc=syntaxcomplete#Complete cpt+=kspell
@@ -400,9 +402,9 @@ function! s:ReplaceSurround(old, new) abort
   try
     let l:key = get(s:surround_alias, a:old, a:old)
     if l:key ==# 't'
-      let l:inner = s:SelectObj('it')
       let l:outer = s:SelectObj('at')
-      if l:outer ==# '' | return | endif
+      if l:outer !~# '^<[^>]*>\_.*</[^>]*>$' | return | endif
+      let l:inner = substitute(l:outer, '^<[^>]*>\(\_.*\)</[^>]*>$', '\1', '')
     else
       " 引号用 2i" 而不是 a"，避免把尾随空白一起删掉
       let l:outer = s:SelectObj((l:key =~# '^[''"`]$' ? '2i' : 'a') . l:key)
@@ -621,7 +623,11 @@ function! s:StripTrailing() abort
 endfunction
 
 function! s:GrepWord() abort
-  let l:word = shellescape(expand('<cword>'), 1)
+  let l:raw = expand('<cword>')
+  if l:raw ==# ''
+    return
+  endif
+  let l:word = shellescape(l:raw, 1)
   " 整词 + 纯文本匹配；系统 grep 需要显式递归当前目录
   execute 'silent grep! ' . (executable('rg') ? '-w -F -- ' . l:word : '-rwF -- ' . l:word . ' .')
   redraw!
@@ -747,7 +753,7 @@ augroup VimrcCore
   autocmd!
   " 分支每个 buffer 只解析一次；改名后重新解析，切回 Vim / 执行外部命令 / 切换目录时强制刷新
   autocmd BufEnter * if !exists('b:status_git_branch') | call s:GitBranchUpdate(bufnr('%')) | endif
-  autocmd BufFilePost * unlet! b:status_git_branch
+  autocmd BufFilePost * call s:GitBranchUpdate(str2nr(expand('<abuf>')))
   " 其他 pane/终端里 git checkout 后切回 Vim 时刷新所有可见窗口的分支
   autocmd FocusGained,ShellCmdPost * call s:GitBranchUpdateVisible()
   if exists('##DirChanged')
@@ -842,18 +848,18 @@ augroup END
 function! s:GitBranch(dir) abort
   " 'path' 语法中空格与逗号需要转义；Windows 下统一为正斜杠
   let l:dir = escape(tr(a:dir, '\', '/'), ' ,')
-  let l:git = finddir('.git', l:dir . ';')
-  if l:git !=# ''
-    let l:git = fnamemodify(l:git, ':p')
-  else
-    let l:gitfile = findfile('.git', l:dir . ';')
-    if l:gitfile !=# '' && filereadable(l:gitfile)
-      let l:lines = readfile(l:gitfile, '', 1)
-      if !empty(l:lines) && l:lines[0] =~# '^gitdir:\s*'
-        let l:git = substitute(l:lines[0], '^gitdir:\s*', '', '')
-        if l:git !~# '^/\|^\a:[\\/]' | let l:git = fnamemodify(l:gitfile, ':p:h') . '/' . l:git | endif
-      endif
+  let l:git = ''
+  let l:gitdir = finddir('.git', l:dir . ';')
+  let l:gitfile = findfile('.git', l:dir . ';')
+  if l:gitfile !=# '' && filereadable(l:gitfile)
+        \ && (l:gitdir ==# '' || len(fnamemodify(l:gitfile, ':p:h')) > len(fnamemodify(l:gitdir, ':p:h:h')))
+    let l:lines = readfile(l:gitfile, '', 1)
+    if !empty(l:lines) && l:lines[0] =~# '^gitdir:\s*'
+      let l:git = substitute(l:lines[0], '^gitdir:\s*', '', '')
+      if l:git !~# '^/\|^\a:[\\/]' | let l:git = fnamemodify(l:gitfile, ':p:h') . '/' . l:git | endif
     endif
+  elseif l:gitdir !=# ''
+    let l:git = fnamemodify(l:gitdir, ':p')
   endif
   let l:head = l:git !=# '' ? substitute(l:git, '[\\/]$', '', '') . '/HEAD' : ''
   if l:head ==# '' || !filereadable(l:head)
